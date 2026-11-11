@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Period, Goal, NonGoal, Project, Task, Event } from '@/types';
+import { Period, Goal, NonGoal, Project, Task, Event, ViewPreference, ViewPreferenceKey, SortField, SortOrder } from '@/types';
 import { createClient } from '@/utils/supabase/client';
 import {
   fromDbPeriod, toDbPeriod,
@@ -9,6 +9,14 @@ import {
   fromDbTask, toDbTask,
   fromDbEvent, toDbEvent
 } from '@/utils/supabase/mapper';
+
+export interface ViewPreferencesState {
+  goals: ViewPreference;
+  projects: ViewPreference;
+  tasks: ViewPreference;
+  expandedProjectGroups: Record<string, boolean>;
+  expandedTaskGroups: Record<string, boolean>;
+}
 
 export interface DashboardState {
   periods: Period[];
@@ -22,9 +30,13 @@ export interface DashboardState {
 
 interface DashboardStore {
   state: DashboardState;
+  viewPreferences: ViewPreferencesState;
   isLoaded: boolean;
   initializeData: (userId?: string) => Promise<void>;
   clearData: () => void;
+  setViewPreference: (key: ViewPreferenceKey, updates: Partial<ViewPreference>) => void;
+  toggleProjectGroup: (groupId: string) => void;
+  toggleTaskGroup: (groupId: string) => void;
   addPeriod: (period: Period) => void;
   updatePeriod: (id: string, updates: Partial<Period>) => void;
   deletePeriod: (id: string) => void;
@@ -56,7 +68,72 @@ const initialState: DashboardState = {
   events: [],
 };
 
+const defaultViewPreference: ViewPreference = {
+  sortField: 'deadline',
+  sortOrder: 'asc',
+  showDone: false,
+};
+
+const defaultViewPreferencesState: ViewPreferencesState = {
+  goals: { ...defaultViewPreference },
+  projects: { ...defaultViewPreference },
+  tasks: { ...defaultViewPreference },
+  expandedProjectGroups: { unassigned: true },
+  expandedTaskGroups: { unassigned: true },
+};
+
 const LAST_SELECTED_PERIOD_KEY = 'personal-dashboard-last-period-id';
+const VIEW_PREFERENCES_KEY = 'personal-dashboard-view-preferences';
+
+const VALID_SORT_FIELDS: SortField[] = ['deadline', 'priority', 'status', 'title', 'createdAt'];
+const VALID_SORT_ORDERS: SortOrder[] = ['asc', 'desc'];
+
+const sanitizeViewPref = (raw: unknown): ViewPreference => {
+  if (!raw || typeof raw !== 'object') return { ...defaultViewPreference };
+  const obj = raw as Record<string, unknown>;
+  return {
+    sortField: VALID_SORT_FIELDS.includes(obj.sortField as SortField)
+      ? (obj.sortField as SortField)
+      : defaultViewPreference.sortField,
+    sortOrder: VALID_SORT_ORDERS.includes(obj.sortOrder as SortOrder)
+      ? (obj.sortOrder as SortOrder)
+      : defaultViewPreference.sortOrder,
+    showDone: typeof obj.showDone === 'boolean' ? obj.showDone : defaultViewPreference.showDone,
+  };
+};
+
+const loadViewPreferencesFromStorage = (): ViewPreferencesState => {
+  if (typeof window === 'undefined') return defaultViewPreferencesState;
+  try {
+    const raw = localStorage.getItem(VIEW_PREFERENCES_KEY);
+    if (!raw) return defaultViewPreferencesState;
+    const parsed = JSON.parse(raw);
+    return {
+      goals: sanitizeViewPref(parsed?.goals),
+      projects: sanitizeViewPref(parsed?.projects),
+      tasks: sanitizeViewPref(parsed?.tasks),
+      expandedProjectGroups:
+        parsed?.expandedProjectGroups && typeof parsed.expandedProjectGroups === 'object'
+          ? parsed.expandedProjectGroups
+          : { unassigned: true },
+      expandedTaskGroups:
+        parsed?.expandedTaskGroups && typeof parsed.expandedTaskGroups === 'object'
+          ? parsed.expandedTaskGroups
+          : { unassigned: true },
+    };
+  } catch {
+    return defaultViewPreferencesState;
+  }
+};
+
+const saveViewPreferencesToStorage = (prefs: ViewPreferencesState) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(VIEW_PREFERENCES_KEY, JSON.stringify(prefs));
+  } catch (err) {
+    console.error('Failed to save view preferences', err);
+  }
+};
 
 const getDefaultPeriodId = (periods: Period[]): string | null => {
   if (periods.length === 0) return null;
@@ -92,12 +169,59 @@ export const useDashboardStore = create<DashboardStore>((set, get) => {
 
   return {
     state: initialState,
+    viewPreferences: loadViewPreferencesFromStorage(),
     isLoaded: false,
 
     clearData: () => set({ state: initialState, isLoaded: false }),
 
+    setViewPreference: (key: ViewPreferenceKey, updates: Partial<ViewPreference>) => {
+      set(prev => {
+        const nextViewPref: ViewPreference = {
+          ...prev.viewPreferences[key],
+          ...updates,
+        };
+        const nextPrefs: ViewPreferencesState = {
+          ...prev.viewPreferences,
+          [key]: nextViewPref,
+        };
+        saveViewPreferencesToStorage(nextPrefs);
+        return { viewPreferences: nextPrefs };
+      });
+    },
+
+    toggleProjectGroup: (groupId: string) => {
+      set(prev => {
+        const nextExpanded = {
+          ...prev.viewPreferences.expandedProjectGroups,
+          [groupId]: !prev.viewPreferences.expandedProjectGroups[groupId],
+        };
+        const nextPrefs: ViewPreferencesState = {
+          ...prev.viewPreferences,
+          expandedProjectGroups: nextExpanded,
+        };
+        saveViewPreferencesToStorage(nextPrefs);
+        return { viewPreferences: nextPrefs };
+      });
+    },
+
+    toggleTaskGroup: (groupId: string) => {
+      set(prev => {
+        const nextExpanded = {
+          ...prev.viewPreferences.expandedTaskGroups,
+          [groupId]: !prev.viewPreferences.expandedTaskGroups[groupId],
+        };
+        const nextPrefs: ViewPreferencesState = {
+          ...prev.viewPreferences,
+          expandedTaskGroups: nextExpanded,
+        };
+        saveViewPreferencesToStorage(nextPrefs);
+        return { viewPreferences: nextPrefs };
+      });
+    },
+
     initializeData: async (userId?: string) => {
       try {
+        const savedPrefs = loadViewPreferencesFromStorage();
         const [
           { data: periodsData },
           { data: goalsData },
@@ -142,6 +266,7 @@ export const useDashboardStore = create<DashboardStore>((set, get) => {
             events: fetchedEvents,
             currentPeriodId: initialPeriodId,
           },
+          viewPreferences: savedPrefs,
           isLoaded: true
         });
       } catch (err) {
@@ -225,9 +350,13 @@ export const useDashboardStore = create<DashboardStore>((set, get) => {
     addGoal: async (goal: Goal) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { error } = await supabase.from('goals').insert({ ...toDbGoal(goal), user_id: user.id });
+      const goalWithTimestamp: Goal = {
+        ...goal,
+        createdAt: goal.createdAt || new Date().toISOString(),
+      };
+      const { error } = await supabase.from('goals').insert({ ...toDbGoal(goalWithTimestamp), user_id: user.id });
       if (error) return console.error('Failed to add goal', error);
-      set(prev => ({ state: { ...prev.state, goals: [...prev.state.goals, goal] } }));
+      set(prev => ({ state: { ...prev.state, goals: [...prev.state.goals, goalWithTimestamp] } }));
     },
 
     updateGoal: async (id: string, rawUpdates: Partial<Goal>) => {
@@ -284,9 +413,13 @@ export const useDashboardStore = create<DashboardStore>((set, get) => {
     addProject: async (project: Project) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { error } = await supabase.from('projects').insert({ ...toDbProject(project), user_id: user.id });
+      const projectWithTimestamp: Project = {
+        ...project,
+        createdAt: project.createdAt || new Date().toISOString(),
+      };
+      const { error } = await supabase.from('projects').insert({ ...toDbProject(projectWithTimestamp), user_id: user.id });
       if (error) return console.error('Failed to add project', error);
-      set(prev => ({ state: { ...prev.state, projects: [...prev.state.projects, project] } }));
+      set(prev => ({ state: { ...prev.state, projects: [...prev.state.projects, projectWithTimestamp] } }));
     },
 
     updateProject: async (id: string, rawUpdates: Partial<Project>) => {
@@ -328,9 +461,13 @@ export const useDashboardStore = create<DashboardStore>((set, get) => {
     addTask: async (task: Task) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { error } = await supabase.from('tasks').insert({ ...toDbTask(task), user_id: user.id });
+      const taskWithTimestamp: Task = {
+        ...task,
+        createdAt: task.createdAt || new Date().toISOString(),
+      };
+      const { error } = await supabase.from('tasks').insert({ ...toDbTask(taskWithTimestamp), user_id: user.id });
       if (error) return console.error('Failed to add task', error);
-      set(prev => ({ state: { ...prev.state, tasks: [...prev.state.tasks, task] } }));
+      set(prev => ({ state: { ...prev.state, tasks: [...prev.state.tasks, taskWithTimestamp] } }));
     },
 
     updateTask: async (id: string, rawUpdates: Partial<Task>) => {

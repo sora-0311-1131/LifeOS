@@ -22,6 +22,7 @@ export const fromDbPeriod = (row: any): Period => ({
   startDate: row.start_date,
   endDate: row.end_date,
   notes: fromDbNull(row.notes),
+  createdAt: fromDbNull(row.created_at),
 });
 
 // --- Goal ---
@@ -44,6 +45,7 @@ export const fromDbGoal = (row: any): Goal => ({
   deadline: fromDbNull(row.deadline),
   priority: fromDbNull(row.priority) as Priority | undefined,
   status: row.status as EntityStatus,
+  createdAt: fromDbNull(row.created_at),
 });
 
 // --- NonGoal ---
@@ -60,6 +62,7 @@ export const fromDbNonGoal = (row: any): NonGoal => ({
   periodId: row.period_id,
   title: row.title,
   notes: fromDbNull(row.notes),
+  createdAt: fromDbNull(row.created_at),
 });
 
 // --- Project ---
@@ -84,6 +87,7 @@ export const fromDbProject = (row: any): Project => ({
   deadline: fromDbNull(row.deadline),
   priority: fromDbNull(row.priority) as Priority | undefined,
   status: row.status as ExtendedStatus,
+  createdAt: fromDbNull(row.created_at),
 });
 
 // --- Task ---
@@ -110,6 +114,7 @@ export const fromDbTask = (row: any): Task => ({
   deadline: fromDbNull(row.deadline),
   priority: fromDbNull(row.priority) as Priority | undefined,
   status: row.status as ExtendedStatus,
+  createdAt: fromDbNull(row.created_at),
 });
 
 // --- Event ---
@@ -126,4 +131,5 @@ export const fromDbEvent = (row: any): import('@/types').Event => ({
   title: row.title,
   date: row.date,
   notes: fromDbNull(row.notes),
+  createdAt: fromDbNull(row.created_at),
 });
