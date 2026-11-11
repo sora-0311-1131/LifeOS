@@ -47,7 +47,7 @@ const NAVIGATION_ITEMS: NavItem[] = [
   { name: 'AI', href: '/ai', icon: Bot, comingSoon: true },
 ];
 
-const SETTINGS_COMING_SOON = true;
+const SETTINGS_COMING_SOON = false;
 
 function ComingSoonItem({ item }: { item: NavItem }) {
   const Icon = item.icon;
