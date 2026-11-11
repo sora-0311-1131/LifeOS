@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Mail,
   ArrowRight,
@@ -15,12 +14,10 @@ import {
 } from 'lucide-react';
 import { siteConfig } from '@/config/site';
 import { createClient } from '@/utils/supabase/client';
-import { revalidateSession } from './actions';
 
 type AuthStep = 'initial' | 'verify-otp' | 'register-passkey';
 
 export default function LoginPage() {
-  const router = useRouter();
   const supabase = createClient();
 
   const [step, setStep] = useState<AuthStep>('initial');
@@ -32,10 +29,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
-  const finishLogin = async () => {
-    await revalidateSession();
-    router.push('/');
-    router.refresh();
+  const finishLogin = () => {
+    window.location.assign('/');
   };
 
   const handlePasskeySignIn = async () => {

@@ -55,7 +55,7 @@ export const updateSession = async (request: NextRequest) => {
   }
 
   // Redirect users away from login page if they are already logged in
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
+  if (user && request.method === 'GET' && request.nextUrl.pathname.startsWith('/login')) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)

@@ -83,7 +83,7 @@ export default function Sidebar() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    router.refresh();
+    window.location.assign('/login');
   };
 
   return (
