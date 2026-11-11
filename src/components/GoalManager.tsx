@@ -3,11 +3,13 @@
 import React, { useState } from 'react';
 import { useDashboard } from '@/store/DashboardContext';
 import { Goal, Priority } from '@/types';
-import { Target, Plus, ArrowUpDown, Eye, EyeOff } from 'lucide-react';
+import { Target, Plus } from 'lucide-react';
 import GoalItem from './GoalItem';
+import SortControls from './SortControls';
+import { sortEntities } from '@/utils/sort';
 
 export default function GoalManager({ onGoalClick }: { onGoalClick?: (id: string) => void } = {}) {
-  const { state, addGoal } = useDashboard();
+  const { state, viewPreferences, setViewPreference, addGoal } = useDashboard();
   const [isCreating, setIsCreating] = useState(false);
   const [newGoal, setNewGoal] = useState<{
     title: string;
@@ -16,44 +18,16 @@ export default function GoalManager({ onGoalClick }: { onGoalClick?: (id: string
     notes: string;
   }>({ title: '', priority: '', deadline: '', notes: '' });
 
-  const [sortBy, setSortBy] = useState<'deadline-asc' | 'priority-desc' | 'status'>('deadline-asc');
-  const [showDone, setShowDone] = useState(false);
+  const { sortField, sortOrder, showDone } = viewPreferences.goals;
 
   const currentPeriodId = state.currentPeriodId;
-  const currentGoals = state.goals
-    .filter((g) => g.periodId === currentPeriodId)
-    .filter((g) => showDone || g.status !== 'done')
-    .sort((a, b) => {
-      if (sortBy === 'deadline-asc') {
-        if (!a.deadline && !b.deadline) return 0;
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-      }
-      if (sortBy === 'priority-desc') {
-        const pOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
-        const pA = a.priority ? pOrder[a.priority] : 3;
-        const pB = b.priority ? pOrder[b.priority] : 3;
-        if (pA !== pB) {
-          return pA - pB;
-        }
-        if (!a.deadline && !b.deadline) return 0;
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-      }
-      if (sortBy === 'status') {
-        const sOrder = { 'todo': 0, 'in-progress': 1, 'done': 2 };
-        if (sOrder[a.status] !== sOrder[b.status]) {
-          return sOrder[a.status] - sOrder[b.status];
-        }
-        if (!a.deadline && !b.deadline) return 0;
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-      }
-      return 0;
-    });
+  const currentGoals = sortEntities(
+    state.goals
+      .filter((g) => g.periodId === currentPeriodId)
+      .filter((g) => showDone || g.status !== 'done'),
+    sortField,
+    sortOrder
+  );
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,30 +58,14 @@ export default function GoalManager({ onGoalClick }: { onGoalClick?: (id: string
           Goals
         </h2>
         <div className="flex flex-wrap items-center gap-4">
-          <button
-            onClick={() => setShowDone(!showDone)}
-            className={`text-sm flex items-center gap-1 font-medium px-3 py-1.5 rounded-md transition-colors ${
-              showDone
-                ? 'bg-neutral-200 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600'
-                : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-            }`}
-            title={showDone ? "Hide done items" : "Show done items"}
-          >
-            {showDone ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            <span className="hidden sm:inline">{showDone ? 'Hide Done' : 'Show Done'}</span>
-          </button>
-          <div className="flex items-center gap-2 text-sm text-neutral-500 bg-neutral-50 dark:bg-neutral-800/50 px-2 py-1.5 rounded-md border border-neutral-200 dark:border-neutral-700">
-            <ArrowUpDown className="w-4 h-4" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'deadline-asc' | 'priority-desc' | 'status')}
-              className="bg-transparent border-none outline-none cursor-pointer text-neutral-700 dark:text-neutral-300 font-medium"
-            >
-              <option value="deadline-asc">Deadline (Ascending)</option>
-              <option value="priority-desc">Priority (High to Low)</option>
-              <option value="status">Status</option>
-            </select>
-          </div>
+          <SortControls
+            sortField={sortField}
+            sortOrder={sortOrder}
+            showDone={showDone}
+            onSortFieldChange={(field) => setViewPreference('goals', { sortField: field })}
+            onToggleSortOrder={() => setViewPreference('goals', { sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' })}
+            onToggleShowDone={() => setViewPreference('goals', { showDone: !showDone })}
+          />
           <button
             onClick={() => setIsCreating(!isCreating)}
             className="text-sm flex items-center gap-1 text-indigo-600 hover:text-indigo-700 font-medium bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1.5 rounded-md transition-colors"
