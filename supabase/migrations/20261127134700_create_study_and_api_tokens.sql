@@ -105,8 +105,8 @@ create index if not exists study_spots_user_id_idx
 create table if not exists public.study_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  -- NO ACTION (default) instead of RESTRICT: still blocks deleting a category in use,
-  -- but defers the check to end of statement so auth.users cascade deletes succeed.
+  -- NO ACTION (default): blocks deleting a category in use, with the check deferred
+  -- to end of statement so it never races the auth.users cascade into study_sessions.
   category_id uuid not null references public.study_categories(id),
   spot_id uuid references public.study_spots(id) on delete set null,
   goal_id uuid references public.goals(id) on delete set null,

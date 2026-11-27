@@ -96,7 +96,7 @@
 #### `public.study_sessions`
 - `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`
 - `user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE`
-- `category_id uuid NOT NULL REFERENCES public.study_categories(id)`（`ON DELETE NO ACTION`。`RESTRICT` だと `auth.users` 削除時のカスケードが失敗し得るため）
+- `category_id uuid NOT NULL REFERENCES public.study_categories(id)`（`ON DELETE NO ACTION`。使用中カテゴリの削除は防ぎつつ、チェックを文末まで遅らせて `auth.users` 削除時のカスケードと競合しないようにする）
 - `spot_id uuid REFERENCES public.study_spots(id) ON DELETE SET NULL`
 - **LifeOS 連携（任意）**:
   - `goal_id uuid REFERENCES public.goals(id) ON DELETE SET NULL`
