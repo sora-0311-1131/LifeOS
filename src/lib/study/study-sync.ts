@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { StudySessionRow } from '@/types/study';
 import {
+  MAX_FUTURE_SKEW_MS,
   parseCoordinates,
   parseOccurredAt,
   parseOptionalString,
@@ -82,7 +83,9 @@ export function parseSyncEvents(
     if (obj.occurred_at === undefined || obj.occurred_at === null || obj.occurred_at === '') {
       return { ok: false, error: `events[${i}].occurred_at is required.` };
     }
-    const occurred = parseOccurredAt(obj.occurred_at);
+    // Future timestamps are accepted here and clamped in syncStudyEvents, so one event from a
+    // fast device clock can't make the whole batch fail (and the client queue retry forever).
+    const occurred = parseOccurredAt(obj.occurred_at, { allowFuture: true });
     if (!occurred.ok) {
       return { ok: false, error: `events[${i}]: ${occurred.error}` };
     }
@@ -136,6 +139,9 @@ export function parseSyncEvents(
  * - If a `start` arrives while another session is active, automatically closes the
  *   previous active session with `needs_review = true` so recording never stalls.
  * - Skips current-weather lookup for historical events older than 30 minutes.
+ * - Events more than `MAX_FUTURE_SKEW_MS` ahead of `now` (fast device clock) are applied at `now`,
+ *   while ordering still uses the client timestamps, so a future start/stop pair ends up closed
+ *   instead of leaving an unstoppable session.
  */
 export async function syncStudyEvents(
   supabase: SupabaseClient,
@@ -152,8 +158,11 @@ export async function syncStudyEvents(
 
   const processed_event_ids: string[] = [];
   const results: SyncEventResult[] = [];
+  const latestAllowedMs = now.getTime() + MAX_FUTURE_SKEW_MS;
 
-  for (const event of ordered) {
+  for (const rawEvent of ordered) {
+    const event: SyncEvent =
+      rawEvent.occurred_at.getTime() > latestAllowedMs ? { ...rawEvent, occurred_at: now } : rawEvent;
     if (event.type === 'start') {
       // Pre-check idempotency before touching any active session
       const { data: existingStart } = await supabase

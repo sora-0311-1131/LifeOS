@@ -16,8 +16,9 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' };
 /**
  * Single-call toggle endpoint for NFC tags / iOS Shortcuts.
  * - Studying now  -> stops the active session.
- * - Not studying  -> starts a session with `category_id` (query) or the last used category.
- * Optional query params: `tag_id`, `category_id`, `goal_id`, `project_id`, `task_id`.
+ * - Not studying  -> starts a session with `category_id` or `category_name` (query; `category_id`
+ *   wins if both are given) or, if neither is given, the last used category.
+ * Optional query params: `tag_id`, `category_id`, `category_name`, `goal_id`, `project_id`, `task_id`.
  * No request body is required. Response includes a ready-to-display `message`.
  */
 export async function POST(request: Request): Promise<NextResponse> {
@@ -29,6 +30,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   const url = new URL(request.url);
   const tagId = parseOptionalString(url.searchParams.get('tag_id')) ?? null;
   const requestedCategoryId = parseOptionalString(url.searchParams.get('category_id')) ?? null;
+  const requestedCategoryName =
+    parseOptionalString(url.searchParams.get('category_name')) ?? null;
   const goalId = parseOptionalString(url.searchParams.get('goal_id')) ?? null;
   const projectId = parseOptionalString(url.searchParams.get('project_id')) ?? null;
   const taskId = parseOptionalString(url.searchParams.get('task_id')) ?? null;
@@ -61,8 +64,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const categoryId = requestedCategoryId ?? status.data.last_category?.id ?? null;
-  if (!categoryId) {
+  const hasRequestedCategory = Boolean(requestedCategoryId || requestedCategoryName);
+  const categoryId = hasRequestedCategory
+    ? requestedCategoryId
+    : (status.data.last_category?.id ?? null);
+  if (!categoryId && !requestedCategoryName) {
     return NextResponse.json(
       { error: 'No category available. Create a category in /study first.' },
       { status: 409, headers: NO_STORE_HEADERS }
@@ -71,6 +77,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const started = await startStudySession(supabase, auth.userId, {
     category_id: categoryId,
+    category_name: requestedCategoryId ? null : requestedCategoryName,
     tag_id: tagId,
     goal_id: goalId,
     project_id: projectId,

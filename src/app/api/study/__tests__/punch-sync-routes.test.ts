@@ -271,4 +271,57 @@ describe('Study punch & sync API routes', () => {
     expect(okRes.status).toBe(200);
     expect(await okRes.json()).toMatchObject({ processed_event_ids: ['e1'] });
   });
+
+  it('POST /api/study/start rejects occurred_at far in the future', async () => {
+    mockResolveStudyAuth.mockResolvedValue(AUTH_OK);
+    const res = await postStart(
+      new Request('http://localhost/api/study/start', {
+        method: 'POST',
+        body: JSON.stringify({ category_id: 'c-1', occurred_at: '2099-01-01T00:00:00.000Z' }),
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(mockStartStudySession).not.toHaveBeenCalled();
+  });
+
+  it('POST /api/study/toggle starts by category_name when given in the query', async () => {
+    mockResolveStudyAuth.mockResolvedValue(AUTH_OK);
+    mockGetStudyStatus.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        is_active: false,
+        last_category: { id: 'c-1', name: '英語' },
+        categories: [],
+      },
+    });
+    mockStartStudySession.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        status: 'started',
+        already_exists: false,
+        session_id: 's-3',
+        category_id: 'c-2',
+        category_name: '数学',
+        location_label: 'Other',
+        started_at: '2026-11-27T11:00:00.000Z',
+        goal_id: null,
+        project_id: null,
+        task_id: null,
+      },
+    });
+
+    const res = await postToggle(
+      new Request(
+        `http://localhost/api/study/toggle?category_name=${encodeURIComponent('数学')}`,
+        { method: 'POST' }
+      )
+    );
+    expect(res.status).toBe(201);
+    // The last used category must not override an explicitly requested category_name
+    expect(mockStartStudySession).toHaveBeenCalledWith(
+      FAKE_SUPABASE,
+      'user-1',
+      expect.objectContaining({ category_id: null, category_name: '数学' })
+    );
+  });
 });

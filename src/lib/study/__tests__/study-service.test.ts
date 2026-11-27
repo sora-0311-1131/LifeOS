@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { describe, expect, it } from 'vitest';
 import {
   getDefaultStudySettings,
+  parseOccurredAt,
   startStudySession,
   stopStudySession,
   verifyPlanEntityOwnership,
@@ -210,5 +211,17 @@ describe('study-service', () => {
 
     expect(result).toEqual({ ok: true });
     expect(queriedTables.sort()).toEqual(['goals', 'projects', 'tasks']);
+  });
+
+  it('parseOccurredAt rejects timestamps beyond the future clock-skew tolerance', () => {
+    const now = new Date('2026-11-27T10:00:00.000Z');
+    expect(parseOccurredAt(undefined, { now })).toEqual({ ok: true, date: now });
+    expect(parseOccurredAt('2026-11-27T10:09:00.000Z', { now }).ok).toBe(true);
+    expect(parseOccurredAt('2026-11-27T09:00:00.000Z', { now }).ok).toBe(true);
+
+    const tooFar = parseOccurredAt('2026-11-27T10:11:00.000Z', { now });
+    expect(tooFar.ok).toBe(false);
+
+    expect(parseOccurredAt('2030-01-01T00:00:00.000Z', { now, allowFuture: true }).ok).toBe(true);
   });
 });
