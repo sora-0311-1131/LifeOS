@@ -19,6 +19,47 @@ interface CreatedTokenState {
   rawToken: string;
 }
 
+const SESSION_EXPIRED_MESSAGE =
+  'セッションの有効期限が切れました。ページを再読み込みするか、再ログインしてください。';
+
+/** Parses a JSON body without throwing on empty or non-JSON responses. */
+async function readJson(res: Response): Promise<Record<string, unknown> | null> {
+  try {
+    return (await res.json()) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** Maps an API error response to a user-facing message (401 -> re-login guidance). */
+function toErrorMessage(
+  res: Response,
+  data: Record<string, unknown> | null,
+  fallback: string
+): string {
+  if (res.status === 401) return SESSION_EXPIRED_MESSAGE;
+  return typeof data?.error === 'string' && data.error ? data.error : fallback;
+}
+
+type FetchTokensResult =
+  | { ok: true; tokens: ApiTokenSummary[] }
+  | { ok: false; error: string };
+
+async function fetchTokens(): Promise<FetchTokensResult> {
+  const fallback = 'API トークンの取得に失敗しました';
+  try {
+    const res = await fetch('/api/settings/tokens', { cache: 'no-store' });
+    const data = await readJson(res);
+    if (!res.ok) {
+      return { ok: false, error: toErrorMessage(res, data, fallback) };
+    }
+    const tokens = Array.isArray(data?.tokens) ? (data.tokens as ApiTokenSummary[]) : [];
+    return { ok: true, tokens };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : fallback };
+  }
+}
+
 export default function ApiTokenManager() {
   const [tokens, setTokens] = useState<ApiTokenSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,46 +72,25 @@ export default function ApiTokenManager() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const loadTokens = useCallback(async () => {
-    try {
-      const res = await fetch('/api/settings/tokens', { cache: 'no-store' });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.error || 'API トークンの取得に失敗しました');
-        return;
-      }
-      setTokens(Array.isArray(data.tokens) ? data.tokens : []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'API トークンの取得に失敗しました');
-    } finally {
-      setIsLoading(false);
+  const applyFetchResult = useCallback((result: FetchTokensResult) => {
+    if (result.ok) {
+      setTokens(result.tokens);
+    } else {
+      setError(result.error);
     }
   }, []);
 
   useEffect(() => {
     let active = true;
-    fetch('/api/settings/tokens', { cache: 'no-store' })
-      .then(async (res) => {
-        const data = await res.json();
-        if (!active) return;
-        if (!res.ok) {
-          setError(data?.error || 'API トークンの取得に失敗しました');
-        } else {
-          setTokens(Array.isArray(data.tokens) ? data.tokens : []);
-        }
-      })
-      .catch((err) => {
-        if (!active) return;
-        setError(err instanceof Error ? err.message : 'API トークンの取得に失敗しました');
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
-
+    fetchTokens().then((result) => {
+      if (!active) return;
+      applyFetchResult(result);
+      setIsLoading(false);
+    });
     return () => {
       active = false;
     };
-  }, []);
+  }, [applyFetchResult]);
 
   const handleCreateToken = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -88,24 +108,25 @@ export default function ApiTokenManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: trimmedName }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
 
-      if (!res.ok) {
-        setError(data?.error || 'API トークンの発行に失敗しました');
+      if (!res.ok || typeof data?.rawToken !== 'string') {
+        setError(toErrorMessage(res, data, 'API トークンの発行に失敗しました'));
         return;
       }
 
+      const token = data.token as ApiTokenSummary | undefined;
       setNewTokenName('');
+      // The one-time banner itself confirms issuance, so no separate success message here.
       setCreatedToken({
-        id: data.token?.id,
-        name: data.token?.name ?? trimmedName,
+        id: token?.id,
+        name: token?.name ?? trimmedName,
         rawToken: data.rawToken,
       });
-      setSuccessMessage('新しい API トークンを発行しました。');
-      if (data.token) {
-        setTokens((prev) => [data.token as ApiTokenSummary, ...prev]);
+      if (token) {
+        setTokens((prev) => [token, ...prev]);
       } else {
-        await loadTokens();
+        applyFetchResult(await fetchTokens());
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'API トークンの発行に失敗しました');
@@ -134,10 +155,10 @@ export default function ApiTokenManager() {
       const res = await fetch(`/api/settings/tokens/${tokenId}`, {
         method: 'DELETE',
       });
-      const data = await res.json();
+      const data = await readJson(res);
 
       if (!res.ok) {
-        setError(data?.error || 'API トークンの削除に失敗しました');
+        setError(toErrorMessage(res, data, 'API トークンの削除に失敗しました'));
         return;
       }
 
@@ -188,7 +209,7 @@ export default function ApiTokenManager() {
         </div>
       )}
 
-      {successMessage && !createdToken && (
+      {successMessage && (
         <div className="p-3.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50 rounded-xl text-sm text-emerald-700 dark:text-emerald-300 font-medium">
           {successMessage}
         </div>
