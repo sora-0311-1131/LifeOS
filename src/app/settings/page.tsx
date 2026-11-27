@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
+import ApiTokenManager from '@/components/settings/ApiTokenManager';
 
 type PasskeyItem = {
   id: string;
@@ -135,7 +136,7 @@ export default function SettingsPage() {
             Settings
           </h1>
           <p className="text-neutral-500 mt-2">
-            パスキー（生体認証・セキュリティキー）の登録と管理を行います。
+            パスキー（生体認証・セキュリティキー）および外部連携用 API トークンの管理を行います。
           </p>
         </div>
 
@@ -281,6 +282,9 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
+
+        {/* Personal API Tokens */}
+        <ApiTokenManager />
       </div>
     </main>
   );
