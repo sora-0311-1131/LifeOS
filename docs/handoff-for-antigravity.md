@@ -137,6 +137,7 @@ flowchart LR
 
 - **Vercel Preview**：`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SERVICE_ROLE_KEY` は Production と Preview の両方に設定済み。Preview も**本番と同じ Supabase（`LifeOS`）**に繋がるため、Preview で作ったテストデータは確認後に削除すること。
 - **Preview でのログイン**：パスキーはドメインに紐づくため Preview では使えない。メールのログインリンクを使う（Supabase の Redirect URLs に `https://lifeos-*-sora0311.vercel.app/**` を追加済み）。
+- **計画系テーブルの匿名アクセス削除**：`goals` / `non_goals` / `periods` / `projects` / `tasks` にあった `anon_*` ポリシー（条件 `true`）と `anon` 権限を削除するマイグレーション `20261127170000_drop_anon_policies_on_planning_tables.sql` を追加（ログイン前の名残で、誰でも全行を読み書きできる状態だった）。**本番適用はユーザーの指示待ち。** 今後テーブルを作るときも `anon` 向けのポリシーは作らないこと。
 - **祝日判定（`src/lib/study/time.ts`）**：2020 年以降のみ対応。Study の利用開始は 2026 年なので、移行データも含めて範囲内。祝日法が改正されたら `getJapaneseHolidaysForYear()` とテストを更新すること。
 
 ---
