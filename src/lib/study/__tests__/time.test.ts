@@ -7,6 +7,7 @@ import {
   getLogicalDayBoundsUtc,
   getOverlapSeconds,
   getUnivPeriod,
+  getJapaneseHolidaysForYear,
   isJapaneseHoliday,
 } from '../time';
 
@@ -91,5 +92,17 @@ describe('time utilities', () => {
     map.set('2026-11-24', 15);
     map.set('2026-11-25', 10);
     expect(calculateStreak(map, '2026-11-25', 30)).toBe(0);
+  });
+
+  it('matches the official Japanese holiday calendar for 2024-2026', () => {
+    const expected: Record<number, string[]> = {
+      2024: ['01-01', '01-08', '02-11', '02-12', '02-23', '03-20', '04-29', '05-03', '05-04', '05-05', '05-06', '07-15', '08-11', '08-12', '09-16', '09-22', '09-23', '10-14', '11-03', '11-04', '11-23'],
+      2025: ['01-01', '01-13', '02-11', '02-23', '02-24', '03-20', '04-29', '05-03', '05-04', '05-05', '05-06', '07-21', '08-11', '09-15', '09-23', '10-13', '11-03', '11-23', '11-24'],
+      2026: ['01-01', '01-12', '02-11', '02-23', '03-20', '04-29', '05-03', '05-04', '05-05', '05-06', '07-20', '08-11', '09-21', '09-22', '09-23', '10-12', '11-03', '11-23'],
+    };
+    for (const [year, days] of Object.entries(expected)) {
+      const actual = [...getJapaneseHolidaysForYear(Number(year))].sort();
+      expect(actual).toEqual(days.map((d) => `${year}-${d}`).sort());
+    }
   });
 });

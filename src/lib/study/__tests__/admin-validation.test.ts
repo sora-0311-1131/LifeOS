@@ -67,4 +67,14 @@ describe('admin-validation utilities', () => {
     expect(parseUnivPeriodsOrDefault('corrupted')).toEqual(DEFAULT_UNIV_PERIODS);
     expect(parseUnivPeriodsOrDefault(DEFAULT_UNIV_PERIODS)).toEqual(DEFAULT_UNIV_PERIODS);
   });
+
+  it('returns a copy of the defaults so callers cannot mutate DEFAULT_UNIV_PERIODS', () => {
+    const snapshot = structuredClone(DEFAULT_UNIV_PERIODS);
+    const fallback = parseUnivPeriodsOrDefault(null);
+    expect(fallback).not.toBe(DEFAULT_UNIV_PERIODS);
+
+    fallback[0].label = 'mutated';
+    fallback.push({ key: 'extra', label: 'Extra', start: '23:00', end: '23:30' });
+    expect(DEFAULT_UNIV_PERIODS).toEqual(snapshot);
+  });
 });

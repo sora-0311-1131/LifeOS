@@ -144,12 +144,24 @@ export function getJapaneseHolidaysForYear(year: number): Set<string> {
   return all;
 }
 
+const holidayCache = new Map<number, ReadonlySet<string>>();
+
+/** Returns the (memoized) holiday set for a year so per-day loops don't recompute it. */
+function getCachedHolidays(year: number): ReadonlySet<string> {
+  let holidays = holidayCache.get(year);
+  if (!holidays) {
+    holidays = getJapaneseHolidaysForYear(year);
+    holidayCache.set(year, holidays);
+  }
+  return holidays;
+}
+
 export function isJapaneseHoliday(ymd: string): boolean {
   const year = Number(ymd.slice(0, 4));
   if (!Number.isInteger(year)) {
     return false;
   }
-  return getJapaneseHolidaysForYear(year).has(ymd);
+  return getCachedHolidays(year).has(ymd);
 }
 
 /**

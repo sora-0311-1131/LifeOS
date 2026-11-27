@@ -2,7 +2,7 @@
 
 > Claude Code（レビュー・修正担当）から、Antigravity（実装担当）への引き継ぎメモです。
 > 実装を始める前にこのファイルを読み、設計の全体像は [study-integration-design.md](./study-integration-design.md)、手順は [study-integration-workflow.md](./study-integration-workflow.md) を参照してください。
-> 最終更新: 2026-11-27（Step 1 完了時点）
+> 最終更新: 2026-11-27（Step 5 完了時点）
 
 ---
 
@@ -13,9 +13,13 @@
 | Step 0 | 設計書・ワークフローを `main` に取り込み | ✅ マージ済み（PR #26） |
 | Step 1 | DB マイグレーションと `src/types/study.ts` | ✅ マージ済み（PR #27）、**本番 DB にも適用済み** |
 | （追加） | `rls_auto_enable()` の EXECUTE 権限削除 | ✅ マージ済み（PR #29）、本番 DB にも適用済み |
-| **Step 2** | 認証基盤（Service Role・2レーン認証・Middleware の例外設定） | ⏭ **次はここから** |
+| Step 2 | 認証基盤（Service Role・2レーン認証・Middleware の例外設定） | ✅ マージ済み（PR #32） |
+| Step 3 | API トークン管理エンドポイント（GET/POST/DELETE） | ✅ マージ済み（PR #33）、本番で動作確認済み |
+| Step 4 | `/settings` の API トークン管理 UI | ✅ マージ済み（PR #34） |
+| Step 5 | Vitest 導入と純粋ロジック（`geo` / `time` / `weather` / `admin-validation`）の移植 | ✅ マージ済み（PR #35） |
+| **Step 6** | Study サービス層の移植（`userId` スコープ化） | ⏭ **次はここから** |
 
-- Step 2 のブランチ名は `feat/study-02-auth-foundation` です。最新の `main` から切ってください。
+- Step 6 のブランチ名は `feat/study-06-study-services` です。最新の `main` から切ってください。
 - Supabase の本番プロジェクトは **`LifeOS`（ref: `yrrtrgedefzlkeqfcjyj`）** です。同じ組織にある `ypt-for-me` は移行元なので、触らないでください。
 
 ---
@@ -116,7 +120,25 @@ flowchart LR
 
 ---
 
-## 7. その他
+## 7. 別 PR で対応する残タスク
+
+レビューで見つかったものの、該当 Step のスコープ外として後回しにしたものです。対応したらこの表から消してください。
+
+| 内容 | 理由 / メモ |
+| :--- | :--- |
+| GitHub Actions で `npm test`（Vitest）を PR ごとに実行する | 現在の CI は `claude-review` と Vercel ビルドのみで、単体テストはローカルでしか走らない。`npm ci` → `npm test` だけの軽いワークフローでよい。ブランチ名例: `chore/ci-vitest` |
+
+---
+
+## 8. 環境・運用メモ
+
+- **Vercel Preview**：`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SERVICE_ROLE_KEY` は Production と Preview の両方に設定済み。Preview も**本番と同じ Supabase（`LifeOS`）**に繋がるため、Preview で作ったテストデータは確認後に削除すること。
+- **Preview でのログイン**：パスキーはドメインに紐づくため Preview では使えない。メールのログインリンクを使う（Supabase の Redirect URLs に `https://lifeos-*-sora0311.vercel.app/**` を追加済み）。
+- **祝日判定（`src/lib/study/time.ts`）**：2020 年以降のみ対応。Study の利用開始は 2026 年なので、移行データも含めて範囲内。祝日法が改正されたら `getJapaneseHolidaysForYear()` とテストを更新すること。
+
+---
+
+## 9. その他
 
 - **Next.js 16**：`AGENTS.md` にあるとおり、学習データとは API が違う箇所があります。実装の前に `node_modules/next/dist/docs/` を確認してください（middleware の書き方も含みます）。
 - **リポジトリ名の変更**：旧名 `Personal-Dashboard` から **`LifeOS`** に変わりました。ローカルの `origin` も `https://github.com/sora-0311-1131/LifeOS.git` に更新済みです。

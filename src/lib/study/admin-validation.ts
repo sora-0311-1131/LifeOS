@@ -79,5 +79,6 @@ export function validateUnivPeriods(
  */
 export function parseUnivPeriodsOrDefault(value: unknown): UnivPeriod[] {
   const result = validateUnivPeriods(value);
-  return result.ok ? result.periods : DEFAULT_UNIV_PERIODS;
+  // Return copies so callers can't mutate the shared DEFAULT_UNIV_PERIODS constant.
+  return result.ok ? result.periods : DEFAULT_UNIV_PERIODS.map((period) => ({ ...period }));
 }
