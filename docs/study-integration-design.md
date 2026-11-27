@@ -54,7 +54,7 @@
 | `revoked_at` | `timestamptz` | 失効日時（`NULL` の間有効） |
 | `created_at` | `timestamptz` | `NOT NULL DEFAULT now()` |
 
-- **RLS**: `authenticated` が自身の行のみ `SELECT` / `INSERT` / `UPDATE` / `DELETE` 可能。
+- **RLS / 権限**: `authenticated` は自身の行の `SELECT`（`token_hash` を除く列のみ）と `DELETE` のみ可能。発行（`INSERT`）と `last_used_at` の更新はサーバー側の `Service Role` クライアントで行う。
 - **検証フロー**: Bearer トークン受信時にサーバー側で SHA-256 を計算し、`Service Role` クライアントで `token_hash` 一致かつ `revoked_at IS NULL` を照合して `user_id` を解決する（`last_used_at` を更新）。
 
 ---
@@ -96,7 +96,7 @@
 #### `public.study_sessions`
 - `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`
 - `user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE`
-- `category_id uuid NOT NULL REFERENCES public.study_categories(id) ON DELETE RESTRICT`
+- `category_id uuid NOT NULL REFERENCES public.study_categories(id)`（`ON DELETE NO ACTION`。使用中カテゴリの削除は防ぎつつ、チェックを文末まで遅らせて `auth.users` 削除時のカスケードと競合しないようにする）
 - `spot_id uuid REFERENCES public.study_spots(id) ON DELETE SET NULL`
 - **LifeOS 連携（任意）**:
   - `goal_id uuid REFERENCES public.goals(id) ON DELETE SET NULL`
