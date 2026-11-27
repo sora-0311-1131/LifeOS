@@ -16,6 +16,7 @@
     "nextjs-toploader": "^3.9.17",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "server-only": "^0.0.1",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

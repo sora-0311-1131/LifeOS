@@ -4,7 +4,37 @@ import { type NextRequest, NextResponse } from "next/server";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
+/**
+ * API routes that support Bearer token authentication (NFC / iOS Shortcuts) in addition to cookies.
+ */
+function isBearerCapableApiPath(pathname: string): boolean {
+  return pathname === '/api/study' || pathname.startsWith('/api/study/');
+}
+
+/**
+ * API routes that handle their own authentication and must return JSON 401/403
+ * instead of being redirected to /login by the proxy.
+ */
+function isSelfAuthenticatedApiPath(pathname: string): boolean {
+  return (
+    isBearerCapableApiPath(pathname) ||
+    pathname === '/api/settings/tokens' ||
+    pathname.startsWith('/api/settings/tokens/')
+  );
+}
+
 export const updateSession = async (request: NextRequest) => {
+  const pathname = request.nextUrl.pathname;
+
+  // Skip cookie session refresh for Bearer-authenticated Study API requests (e.g., NFC / iOS Shortcuts)
+  if (isBearerCapableApiPath(pathname) && request.headers.has('authorization')) {
+    return NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    });
+  }
+
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
@@ -45,8 +75,9 @@ export const updateSession = async (request: NextRequest) => {
   // Protect the dashboard and any other sensitive routes
   if (
     !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
+    !pathname.startsWith('/login') &&
+    !pathname.startsWith('/auth') &&
+    !isSelfAuthenticatedApiPath(pathname)
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone()
