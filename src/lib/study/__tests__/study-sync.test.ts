@@ -287,4 +287,33 @@ describe('syncStudyEvents', () => {
       outcome: 'error',
     });
   });
+
+  it('clears a stop event that predates the currently active (newer) session instead of retrying forever', async () => {
+    mockStopStudySession.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      error: 'occurred_at cannot be earlier than the session started_at.',
+      code: 'stop_before_start',
+    });
+    mockStopStudySession.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      error: 'Failed to stop study session.',
+    });
+
+    const parsed = parseSyncEvents([
+      { client_event_id: 'evt-old-stop', type: 'stop', occurred_at: '2026-11-25T08:00:00.000Z' },
+      { client_event_id: 'evt-fail-stop', type: 'stop', occurred_at: '2026-11-25T08:30:00.000Z' },
+    ]);
+    if (!parsed.ok) throw new Error(parsed.error);
+
+    const result = await syncStudyEvents({} as SupabaseClient, TEST_USER_ID, parsed.events);
+    expect(result.processed_event_ids).toEqual(['evt-old-stop']);
+    expect(result.results[0]).toMatchObject({
+      client_event_id: 'evt-old-stop',
+      outcome: 'skipped_no_active',
+    });
+    // Genuine server failures must stay unprocessed so the client retries them later
+    expect(result.results[1]).toMatchObject({ client_event_id: 'evt-fail-stop', outcome: 'error' });
+  });
 });

@@ -313,8 +313,12 @@ export async function syncStudyEvents(
           outcome: stopResult.data.already_exists ? 'already_exists' : 'applied',
           session_id: stopResult.data.session_id,
         });
-      } else if (stopResult.status === 404) {
-        // No active session left (e.g. already stopped manually) -> mark processed so queue clears
+      } else if (stopResult.status === 404 || stopResult.code === 'stop_before_start') {
+        // No session this stop can apply to -> mark processed so the client queue clears instead of
+        // retrying forever:
+        // - 404: no active session left (e.g. already stopped manually)
+        // - stop_before_start: the active session started after this stop's occurred_at, i.e. it is a
+        //   newer session (e.g. started online via NFC before the offline queue synced)
         processed_event_ids.push(event.client_event_id);
         results.push({
           client_event_id: event.client_event_id,

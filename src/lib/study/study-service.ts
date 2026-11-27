@@ -33,6 +33,8 @@ export interface StudyServiceError {
   ok: false;
   status: number;
   error: string;
+  /** Machine-readable reason for callers that need to branch on a specific failure. */
+  code?: 'stop_before_start';
 }
 
 export type ServiceResult<T> = ({ ok: true } & T) | StudyServiceError;
@@ -648,6 +650,7 @@ export async function stopStudySession(
       ok: false,
       status: 400,
       error: 'occurred_at cannot be earlier than the session started_at.',
+      code: 'stop_before_start',
     };
   }
 

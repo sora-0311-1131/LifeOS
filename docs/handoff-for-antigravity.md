@@ -2,7 +2,7 @@
 
 > Claude Code（レビュー・修正担当）から、Antigravity（実装担当）への引き継ぎメモです。
 > 実装を始める前にこのファイルを読み、設計の全体像は [study-integration-design.md](./study-integration-design.md)、手順は [study-integration-workflow.md](./study-integration-workflow.md) を参照してください。
-> 最終更新: 2026-11-27（Step 5 完了時点）
+> 最終更新: 2026-11-27（Step 6 完了時点）
 
 ---
 
@@ -17,9 +17,10 @@
 | Step 3 | API トークン管理エンドポイント（GET/POST/DELETE） | ✅ マージ済み（PR #33）、本番で動作確認済み |
 | Step 4 | `/settings` の API トークン管理 UI | ✅ マージ済み（PR #34） |
 | Step 5 | Vitest 導入と純粋ロジック（`geo` / `time` / `weather` / `admin-validation`）の移植 | ✅ マージ済み（PR #35） |
-| **Step 6** | Study サービス層の移植（`userId` スコープ化） | ⏭ **次はここから** |
+| Step 6 | Study サービス層の移植（`userId` スコープ化） | ✅ マージ済み（PR #36） |
+| **Step 7** | 打刻・同期 API（status / start / stop / toggle / sync） | ⏭ **次はここから** |
 
-- Step 6 のブランチ名は `feat/study-06-study-services` です。最新の `main` から切ってください。
+- Step 7 のブランチ名は `feat/study-07-punch-sync-api` です。最新の `main` から切ってください。
 - Supabase の本番プロジェクトは **`LifeOS`（ref: `yrrtrgedefzlkeqfcjyj`）** です。同じ組織にある `ypt-for-me` は移行元なので、触らないでください。
 
 ---
@@ -127,6 +128,8 @@ flowchart LR
 | 内容 | 理由 / メモ |
 | :--- | :--- |
 | GitHub Actions で `npm test`（Vitest）を PR ごとに実行する | 現在の CI は `claude-review` と Vercel ビルドのみで、単体テストはローカルでしか走らない。`npm ci` → `npm test` だけの軽いワークフローでよい。ブランチ名例: `chore/ci-vitest` |
+| **Step 8**：ダッシュボード・分析 API の入力値に上限を設ける | `getStudyAnalyticsData(supabase, userId, days)` の `days` と、`getStudyDashboardData` の `filters.limit` はサービス層で上限チェックをしていない。Route Handler 側で整数化して範囲を制限すること（目安：`days` は 1〜365、`limit` は 1〜200）。範囲外は 400 かクランプのどちらかに統一する。 |
+| **オフライン同期キュー（クライアント実装時）**：`sync` の `outcome: 'error'` の扱いを決める | `processed_event_ids` に入らないイベントはクライアントが再送し続ける。サーバー一時障害なら再送が正しいが、削除済みカテゴリを指す start などは何度送っても失敗する。リトライ回数の上限や、ユーザーへの通知を検討すること。（停止イベントの時刻が進行中セッションより前のケースは、PR #36 でサーバー側が `skipped_no_active` として処理済みにするよう修正済み） |
 
 ---
 
