@@ -23,7 +23,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## 2. 役割分担（現在の運用）
 
 - **Antigravity**: 基本の実装、ローカル検証（型チェック / lint / test / build）、PR 作成
-- **Claude（GitHub 上 + ローカル）**: PR レビュー（`Claude Code Review` / `@claude`）、指摘の修正、マージ、および必要に応じた実装・引き継ぎメモ更新
+- **Claude（GitHub 上 + ローカル）**: PR レビュー（`Claude Code Review` / `@claude`）、指摘の修正、マージ（ユーザーの明示的な指示があるときのみ）、および必要に応じた実装・引き継ぎメモ更新
 - 役割分担や運用を変更する場合は、本ファイルまたは `docs/handoff-for-antigravity.md` を更新して共有する。
 
 ## 3. Git / PR ルール
