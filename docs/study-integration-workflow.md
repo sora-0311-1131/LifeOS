@@ -86,9 +86,9 @@ flowchart LR
 - **内容**:
   - `src/app/api/settings/tokens/route.ts`：
     - `GET`: ログインユーザーの発行済みトークン一覧取得（`token_hash` は返却しない）。
-    - `POST`: `lifeos_` プレフィックス付きの安全なランダムトークン生成 → SHA-256 ハッシュのみ保存 → 生トークンを初回レスポンスで 1 度だけ返却。
+    - `POST`: Cookie セッションでユーザーを確認 → `lifeos_` プレフィックス付きの安全なランダムトークン生成 → `Service Role` クライアントで SHA-256 ハッシュのみ保存 → 生トークンを初回レスポンスで 1 度だけ返却（`authenticated` には `api_tokens` の INSERT 権限がないため）。
   - `src/app/api/settings/tokens/[id]/route.ts`：
-    - `DELETE`: トークンの失効（`revoked_at` 設定または削除）。
+    - `DELETE`: トークンの失効（行の削除。`revoked_at` を設定する場合は `Service Role` クライアントで行う）。
 - **検証**: ブラウザセッションで発行・一覧取得・失効ができ、失効済みトークンで `resolveStudyAuth` が 401 になること。
 
 #### Step 4: `/settings` に API トークン管理 UI を追加

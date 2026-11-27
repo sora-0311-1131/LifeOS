@@ -105,7 +105,9 @@ create index if not exists study_spots_user_id_idx
 create table if not exists public.study_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  category_id uuid not null references public.study_categories(id) on delete restrict,
+  -- NO ACTION (default) instead of RESTRICT: still blocks deleting a category in use,
+  -- but defers the check to end of statement so auth.users cascade deletes succeed.
+  category_id uuid not null references public.study_categories(id),
   spot_id uuid references public.study_spots(id) on delete set null,
   goal_id uuid references public.goals(id) on delete set null,
   project_id uuid references public.projects(id) on delete set null,
@@ -177,7 +179,21 @@ create index if not exists study_sessions_user_needs_review_idx
 -- ============================================================================
 -- 6. Grants & Row-Level Security (authenticated own-row access only, no anon)
 -- ============================================================================
-grant all on table public.api_tokens to authenticated, service_role;
+-- Supabase default privileges grant ALL on new public tables to anon/authenticated,
+-- so revoke explicitly before granting what each role actually needs.
+revoke all on table public.api_tokens from anon, authenticated;
+revoke all on table public.study_settings from anon;
+revoke all on table public.study_categories from anon;
+revoke all on table public.study_spots from anon;
+revoke all on table public.study_sessions from anon;
+
+-- api_tokens: issuing and last_used_at updates go through the server (service_role).
+-- Clients may only list their tokens (without token_hash) and delete (revoke) them.
+grant select (id, user_id, name, token_prefix, scopes, last_used_at, revoked_at, created_at)
+  on table public.api_tokens to authenticated;
+grant delete on table public.api_tokens to authenticated;
+grant all on table public.api_tokens to service_role;
+
 grant all on table public.study_settings to authenticated, service_role;
 grant all on table public.study_categories to authenticated, service_role;
 grant all on table public.study_spots to authenticated, service_role;
@@ -198,13 +214,6 @@ drop policy if exists "Users can delete own api_tokens" on public.api_tokens;
 create policy "Users can view own api_tokens"
   on public.api_tokens for select to authenticated
   using ((select auth.uid()) = user_id);
-create policy "Users can insert own api_tokens"
-  on public.api_tokens for insert to authenticated
-  with check ((select auth.uid()) = user_id);
-create policy "Users can update own api_tokens"
-  on public.api_tokens for update to authenticated
-  using ((select auth.uid()) = user_id)
-  with check ((select auth.uid()) = user_id);
 create policy "Users can delete own api_tokens"
   on public.api_tokens for delete to authenticated
   using ((select auth.uid()) = user_id);
