@@ -132,9 +132,28 @@ export async function resolveStudyAuth(
 }
 
 export function authErrorResponse(failure: StudyAuthFailure): NextResponse {
-  return NextResponse.json({ error: failure.error }, { status: failure.status });
+  return NextResponse.json(
+    { error: failure.error },
+    { status: failure.status, headers: { 'Cache-Control': 'no-store' } }
+  );
 }
 
 export function unauthorizedJson(message = 'Unauthorized'): NextResponse {
-  return NextResponse.json({ error: message }, { status: 401 });
+  return NextResponse.json(
+    { error: message },
+    { status: 401, headers: { 'Cache-Control': 'no-store' } }
+  );
+}
+
+/**
+ * Returns the least-privileged Supabase client matching the authenticated lane:
+ * - `'bearer'`: Service Role client (no user cookie present; services enforce `.eq('user_id', userId)`).
+ * - `'session'`: Cookie-bound SSR server client (enforces Postgres RLS as defense-in-depth).
+ */
+export async function getStudySupabaseClient(auth: StudyAuthSuccess) {
+  if (auth.method === 'bearer') {
+    return createAdminClient();
+  }
+  const cookieStore = await cookies();
+  return createServerClient(cookieStore);
 }

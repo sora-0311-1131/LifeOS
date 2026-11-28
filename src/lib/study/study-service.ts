@@ -47,11 +47,22 @@ export function parseOptionalString(value: unknown): string | null | undefined {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+/** How far in the future a client-supplied `occurred_at` may be (tolerates small clock skew). */
+export const MAX_FUTURE_SKEW_MS = 10 * 60 * 1000;
+
+/**
+ * Parses an optional ISO 8601 `occurred_at` (defaults to `now`).
+ * Rejects timestamps more than `MAX_FUTURE_SKEW_MS` ahead of `now`: a future `started_at` would
+ * make a normal stop fail ("earlier than started_at") and leave an unstoppable session.
+ * Pass `allowFuture: true` where the caller clamps future timestamps itself (offline sync).
+ */
 export function parseOccurredAt(
-  value: unknown
+  value: unknown,
+  options: { now?: Date; allowFuture?: boolean } = {}
 ): { ok: true; date: Date } | { ok: false; error: string } {
+  const now = options.now ?? new Date();
   if (value === undefined || value === null || value === '') {
-    return { ok: true, date: new Date() };
+    return { ok: true, date: now };
   }
   if (typeof value !== 'string') {
     return { ok: false, error: 'occurred_at must be an ISO 8601 timestamp string.' };
@@ -59,6 +70,12 @@ export function parseOccurredAt(
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return { ok: false, error: 'occurred_at is not a valid timestamp.' };
+  }
+  if (!options.allowFuture && date.getTime() - now.getTime() > MAX_FUTURE_SKEW_MS) {
+    return {
+      ok: false,
+      error: 'occurred_at is too far in the future. Check the device clock.',
+    };
   }
   return { ok: true, date };
 }
