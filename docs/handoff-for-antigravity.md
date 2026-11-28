@@ -2,7 +2,7 @@
 
 > Claude Code（レビュー・修正担当）から、Antigravity（実装担当）への引き継ぎメモです。
 > 実装を始める前にこのファイルを読み、設計の全体像は [study-integration-design.md](./study-integration-design.md)、手順は [study-integration-workflow.md](./study-integration-workflow.md) を参照してください。
-> 最終更新: 2026-11-27（Step 6 完了時点）
+> 最終更新: 2026-11-28（Step 7 完了時点）
 
 ---
 
@@ -18,9 +18,11 @@
 | Step 4 | `/settings` の API トークン管理 UI | ✅ マージ済み（PR #34） |
 | Step 5 | Vitest 導入と純粋ロジック（`geo` / `time` / `weather` / `admin-validation`）の移植 | ✅ マージ済み（PR #35） |
 | Step 6 | Study サービス層の移植（`userId` スコープ化） | ✅ マージ済み（PR #36） |
-| **Step 7** | 打刻・同期 API（status / start / stop / toggle / sync） | ⏭ **次はここから** |
+| Step 7 | 打刻・同期 API（status / start / stop / toggle / sync） | ✅ マージ済み（PR #37） |
+| （追加） | 計画系テーブルの `anon` ポリシー・権限削除 | ✅ 本番 DB に適用済み（2026-11-28） |
+| **Step 8** | ダッシュボード・分析・管理 CRUD API | ⏭ **次はここから** |
 
-- Step 7 のブランチ名は `feat/study-07-punch-sync-api` です。最新の `main` から切ってください。
+- Step 8 のブランチ名は `feat/study-08-crud-analytics-api` です。最新の `main` から切ってください。§7 の「入力値に上限を設ける」も Step 8 で対応してください。
 - Supabase の本番プロジェクトは **`LifeOS`（ref: `yrrtrgedefzlkeqfcjyj`）** です。同じ組織にある `ypt-for-me` は移行元なので、触らないでください。
 
 ---
@@ -137,6 +139,7 @@ flowchart LR
 
 - **Vercel Preview**：`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SERVICE_ROLE_KEY` は Production と Preview の両方に設定済み。Preview も**本番と同じ Supabase（`LifeOS`）**に繋がるため、Preview で作ったテストデータは確認後に削除すること。
 - **Preview でのログイン**：パスキーはドメインに紐づくため Preview では使えない。メールのログインリンクを使う（Supabase の Redirect URLs に `https://lifeos-*-sora0311.vercel.app/**` を追加済み）。
+- **計画系テーブルの匿名アクセス削除**：`goals` / `non_goals` / `periods` / `projects` / `tasks` にあった `anon_*` ポリシー（条件 `true`）と `anon` 権限を削除するマイグレーション `20261127170000_drop_anon_policies_on_planning_tables.sql` を追加（ログイン前の名残で、誰でも全行を読み書きできる状態だった）。**本番 DB に適用済み（2026-11-28）。** 適用後、`anon` 向けポリシー・権限が 0 件であること、ログインユーザーが自分の行を読めることを確認済み。 今後テーブルを作るときも `anon` 向けのポリシーは作らないこと。
 - **祝日判定（`src/lib/study/time.ts`）**：2020 年以降のみ対応。Study の利用開始は 2026 年なので、移行データも含めて範囲内。祝日法が改正されたら `getJapaneseHolidaysForYear()` とテストを更新すること。
 
 ---
