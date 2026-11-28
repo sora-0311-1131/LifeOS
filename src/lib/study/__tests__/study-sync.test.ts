@@ -316,4 +316,58 @@ describe('syncStudyEvents', () => {
     // Genuine server failures must stay unprocessed so the client retries them later
     expect(result.results[1]).toMatchObject({ client_event_id: 'evt-fail-stop', outcome: 'error' });
   });
+
+  it('applies far-future events at server time while keeping client ordering', async () => {
+    const now = new Date('2026-11-27T10:00:00.000Z');
+    // study_categories resolves the category; study_sessions has no prior event and no active row
+    const fakeSupabase = {
+      from: (table: string) => ({
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              maybeSingle: async () =>
+                table === 'study_categories'
+                  ? { data: { id: 'cat-1', name: '英語' }, error: null }
+                  : { data: null, error: null },
+            }),
+            is: () => ({ maybeSingle: async () => ({ data: null, error: null }) }),
+          }),
+        }),
+      }),
+    } as unknown as SupabaseClient;
+
+    mockStartStudySession.mockResolvedValueOnce({
+      ok: true,
+      data: { already_exists: false, session_id: 'sess-future' },
+    });
+    mockStopStudySession.mockResolvedValueOnce({
+      ok: true,
+      data: { already_exists: false, session_id: 'sess-future' },
+    });
+
+    // Device clock ~1 day fast: both timestamps are far in the future
+    const parsed = parseSyncEvents([
+      { client_event_id: 'evt-f-stop', type: 'stop', occurred_at: '2026-11-28T11:00:00.000Z' },
+      {
+        client_event_id: 'evt-f-start',
+        type: 'start',
+        category_id: 'cat-1',
+        occurred_at: '2026-11-28T10:00:00.000Z',
+      },
+    ]);
+    if (!parsed.ok) throw new Error(parsed.error);
+
+    const result = await syncStudyEvents(fakeSupabase, TEST_USER_ID, parsed.events, now);
+    expect(result.processed_event_ids).toEqual(['evt-f-start', 'evt-f-stop']);
+    expect(mockStartStudySession).toHaveBeenCalledWith(
+      fakeSupabase,
+      TEST_USER_ID,
+      expect.objectContaining({ client_event_id: 'evt-f-start', occurred_at: now })
+    );
+    expect(mockStopStudySession).toHaveBeenCalledWith(
+      fakeSupabase,
+      TEST_USER_ID,
+      expect.objectContaining({ client_event_id: 'evt-f-stop', occurred_at: now })
+    );
+  });
 });
